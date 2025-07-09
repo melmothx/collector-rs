@@ -8,7 +8,7 @@ use std::env;
 use crate::oai::pmh;
 
 mod oai;
-use oai::pmh::parse_response;
+use oai::pmh::download_all;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,17 +30,7 @@ SELECT id, library_id, url FROM collector_site WHERE url <> '' ORDER BY url
         let (site_id, library_id, url) = todo;
         let client = Arc::clone(&client);
         let task = tokio::spawn(async move {
-            match download_url(&url).await {
-                Ok((status, content)) => {
-                    println!("Downloaded {} bytes from {}: {}", content.len(), url, status);
-                    println!("Parsed {:?}", parse_response(&content));
-                    match insert_dl_result(&client, status, site_id, library_id, &content).await {
-                        Ok(return_id) => println!("Inserted/Updated row with URL ID: {}", return_id),
-                        Err(e) => eprintln!("Error inserting status code for {}: {:?}", url, e),
-                    }
-                }
-                Err(e) => eprintln!("Error Downloading {} {}", url, e),
-            }
+            download_all(&url).await;
         });
         tasks.push(task);
     }

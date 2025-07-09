@@ -5,6 +5,10 @@ use futures::future::join_all;
 use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
+use crate::oai::pmh;
+
+mod oai;
+use oai::pmh::parse_response;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,6 +33,7 @@ SELECT id, library_id, url FROM collector_site WHERE url <> '' ORDER BY url
             match download_url(&url).await {
                 Ok((status, content)) => {
                     println!("Downloaded {} bytes from {}: {}", content.len(), url, status);
+                    println!("Parsed {:?}", parse_response(&content));
                     match insert_dl_result(&client, status, site_id, library_id, &content).await {
                         Ok(return_id) => println!("Inserted/Updated row with URL ID: {}", return_id),
                         Err(e) => eprintln!("Error inserting status code for {}: {:?}", url, e),

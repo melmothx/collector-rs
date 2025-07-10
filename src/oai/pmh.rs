@@ -58,6 +58,16 @@ pub struct OaiPmhRecord {
     metadata: OaiPmhRecordMetadata,
 }
 
+impl OaiPmhRecord {
+    pub fn identifier(&self) -> &str {
+        self.header.identifier.as_str()
+    }
+    pub fn datestamp(&self) -> &str {
+        self.header.datestamp.as_str()
+    }
+}
+
+
 #[derive(Debug, Deserialize)]
 struct ListRecords {
     #[serde(rename = "resumptionToken")]
@@ -106,7 +116,7 @@ async fn download_url(
     }
 }
 
-pub async fn download_all(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
+pub async fn harvest(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
     let mut url = Url::parse(base_url)?;
     url.query_pairs_mut()
         .append_pair("verb", "ListRecords")

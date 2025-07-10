@@ -1,4 +1,3 @@
-use reqwest::{Error as ReqwestError};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use futures::future::join_all;
@@ -6,7 +5,7 @@ use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
 mod oai;
-use oai::pmh::download_all;
+use oai::pmh::harvest;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,8 +27,11 @@ SELECT id, library_id, url FROM collector_site WHERE url <> '' ORDER BY url
         let (site_id, library_id, url) = todo;
         let client = Arc::clone(&client);
         let task = tokio::spawn(async move {
-            let results = download_all(&url).await;
-            println!("All results for {url}: {results:?}");
+            if let Ok(results) = harvest(&url).await {
+                for res in &results {
+                    println!("{} {}", res.identifier(), res.datestamp());
+                }
+            }
         });
         tasks.push(task);
     }

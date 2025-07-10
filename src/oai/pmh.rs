@@ -94,6 +94,7 @@ fn parse_response (xml: &str) -> OaiPmhResponse {
 async fn download_url(
     url: Url
 )-> Result<OaiPmhResponse, Box<dyn std::error::Error>> {
+    println!("Downloading {url}");
     let res = reqwest::get(url).await?;
     let status = res.status().as_u16();
     let content = res.text().await?;
@@ -106,17 +107,27 @@ pub async fn download_all(base_url: &str) -> Result<(), Box<dyn std::error::Erro
         .append_pair("verb", "ListRecords")
         .append_pair("metadataPrefix", "marc21");
     println!("Url is {url}");
+    let mut interaction = 1;
     let records: Vec<OaiPmhRecord> = Vec::new();
     loop {
-        match download_url(url).await {
+        match download_url(url.clone()).await {
             Ok(res) => {
-                println!("{:?}", res);
-                break
+                if let Some(records) = res.list_records {
+                    if let Some(token) = records.resumption_token {
+                        interaction += 1;
+                        println!("{base_url} download n.{interaction}");
+                        url.query_pairs_mut()
+                            .clear()
+                            .append_pair("verb", "ListRecords")
+                            .append_pair("metadataPrefix", "marc21")
+                            .append_pair("resumptionToken", &token);
+                        continue
+                    }
+                }
             },
-            Err(e) => {
-                break
-            }
-        }
+            Err(e) => println!("{e}"),
+        };
+        break
     };
     Ok(())
 }

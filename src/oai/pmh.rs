@@ -13,19 +13,19 @@ struct ResponseError {
 
 
 #[derive(Debug, Deserialize)]
-struct OaiPmhRecordHeader {
+pub struct OaiPmhRecordHeader {
     identifier: String,
     datestamp: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct OaiPmhRecordMetadata {
+pub struct OaiPmhRecordMetadata {
     #[serde(rename = "record")]
     record: MarcRecord,
 }
 
 #[derive(Debug, Deserialize)]
-struct MarcDataField {
+pub struct MarcDataField {
     #[serde(rename = "@tag")]
     tag: String,
     #[serde(rename = "@ind1")]
@@ -37,7 +37,7 @@ struct MarcDataField {
 }
 
 #[derive(Debug, Deserialize)]
-struct MarcSubField {
+pub struct MarcSubField {
     #[serde(rename = "@code")]
     code: String,
     #[serde(rename = "$text")]
@@ -45,7 +45,7 @@ struct MarcSubField {
 }
 
 #[derive(Debug, Deserialize)]
-struct MarcRecord {
+pub struct MarcRecord {
     #[serde(rename = "@xmlns")]
     namespace: String,
     leader: String,
@@ -53,7 +53,7 @@ struct MarcRecord {
 }
 
 #[derive(Debug, Deserialize)]
-struct OaiPmhRecord {
+pub struct OaiPmhRecord {
     header: OaiPmhRecordHeader,
     metadata: OaiPmhRecordMetadata,
 }
@@ -101,18 +101,21 @@ async fn download_url(
     Ok(parse_response(&content))
 }
 
-pub async fn download_all(base_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn download_all(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
     let mut url = Url::parse(base_url)?;
     url.query_pairs_mut()
         .append_pair("verb", "ListRecords")
         .append_pair("metadataPrefix", "marc21");
     println!("Url is {url}");
     let mut interaction = 1;
-    let records: Vec<OaiPmhRecord> = Vec::new();
+    let mut all_records: Vec<OaiPmhRecord> = Vec::new();
     loop {
         match download_url(url.clone()).await {
             Ok(res) => {
                 if let Some(records) = res.list_records {
+                    for rec in records.records {
+                        all_records.push(rec)
+                    }
                     if let Some(token) = records.resumption_token {
                         interaction += 1;
                         println!("{base_url} download n.{interaction}");
@@ -129,6 +132,6 @@ pub async fn download_all(base_url: &str) -> Result<(), Box<dyn std::error::Erro
         };
         break
     };
-    Ok(())
+    Ok(all_records)
 }
 

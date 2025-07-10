@@ -30,7 +30,8 @@ SELECT id, library_id, url FROM collector_site WHERE url <> '' ORDER BY url
         let (site_id, library_id, url) = todo;
         let client = Arc::clone(&client);
         let task = tokio::spawn(async move {
-            download_all(&url).await;
+            let results = download_all(&url).await;
+            println!("{results:?}");
         });
         tasks.push(task);
     }

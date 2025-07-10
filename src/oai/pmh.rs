@@ -1,4 +1,4 @@
-use reqwest::{Error as ReqwestError};
+use reqwest;
 use serde::Deserialize;
 use quick_xml::de::from_str;
 use url::Url;
@@ -94,11 +94,16 @@ fn parse_response (xml: &str) -> OaiPmhResponse {
 async fn download_url(
     url: Url
 )-> Result<OaiPmhResponse, Box<dyn std::error::Error>> {
-    println!("Downloading {url}");
+    // println!("Downloading {url}");
     let res = reqwest::get(url).await?;
     let status = res.status().as_u16();
     let content = res.text().await?;
-    Ok(parse_response(&content))
+    if status == 200 {
+        Ok(parse_response(&content))
+    }
+    else {
+        Err(format!("Status is {status}").into())
+    }
 }
 
 pub async fn download_all(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
@@ -125,10 +130,12 @@ pub async fn download_all(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn s
                             .append_pair("metadataPrefix", "marc21")
                             .append_pair("resumptionToken", &token);
                         continue
+                    } else {
+                        println!("{base_url} download completed");
                     }
                 }
             },
-            Err(e) => println!("{e}"),
+            Err(e) => println!("Error {base_url}: {e}"),
         };
         break
     };

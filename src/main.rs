@@ -5,8 +5,6 @@ use futures::future::join_all;
 use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
-use crate::oai::pmh;
-
 mod oai;
 use oai::pmh::download_all;
 
@@ -31,21 +29,12 @@ SELECT id, library_id, url FROM collector_site WHERE url <> '' ORDER BY url
         let client = Arc::clone(&client);
         let task = tokio::spawn(async move {
             let results = download_all(&url).await;
-            println!("{results:?}");
+            println!("All results for {url}: {results:?}");
         });
         tasks.push(task);
     }
     join_all(tasks).await;
     Ok(())
-}
-
-async fn download_url(
-    url: &str
-)-> Result<(u16, String), ReqwestError> {
-    let res = reqwest::get(url).await?;
-    let status = res.status().as_u16();
-    let content = res.text().await?;
-    Ok((status, content))
 }
 
 async fn insert_dl_result(client: &Arc<Mutex<Client>>, status: u16, site_id: i64, library_id: i64, content: &str)

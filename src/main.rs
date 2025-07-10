@@ -12,7 +12,7 @@ use oai::pmh::download_all;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pg_dsn = env::var("PG_DSN").unwrap();
+    let pg_dsn = env::var("PG_DSN").expect("PG_DSN env variable should be set");
     let (client, connection) = tokio_postgres::connect(&pg_dsn, NoTls).await?;
     tokio::spawn(connection);
     let client = Arc::new(Mutex::new(client));

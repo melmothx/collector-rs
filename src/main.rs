@@ -5,7 +5,7 @@ use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
 mod oai;
-use oai::pmh::harvest;
+use oai::pmh::HarvestParams;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,20 +14,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(connection);
     let client = Arc::new(Mutex::new(client));
     let sql = r#"
-SELECT id, library_id, url FROM collector_site WHERE url <> '' ORDER BY url
+SELECT url, oai_metadata_format, oai_set, last_harvested, id, library_id
+FROM collector_site WHERE url <> ''
+     AND site_type IN ('amusewiki', 'generic', 'koha-marc21', 'koha-unimarc')
+ORDER BY url
 "#;
     let rows = client.lock().await.query(sql, &[]).await?;
-    let urls: Vec<(i64, i64, String)> = rows.iter().map(|row|
-                                                        (row.get(0),
-                                                         row.get(1),
-                                                         row.get(2))).collect();
+    let urls: Vec<(HarvestParams, i64, i64)> = rows.iter().map(|row|
+                                                               (HarvestParams {
+                                                                   base_url: row.get(0),
+                                                                   metadata_prefix: row.get(1),
+                                                                   set: row.get(2),
+                                                                   from: row.get(3),
+                                                               },
+                                                                row.get(4),
+                                                                row.get(5)
+                                                               )).collect();
     // dbg!("{:#?}", urls);
     let mut tasks = Vec::new();
     for todo in urls {
-        let (site_id, library_id, url) = todo;
+        let (params, site_id, library_id) = todo;
         let client = Arc::clone(&client);
         let task = tokio::spawn(async move {
-            if let Ok(results) = harvest(&url).await {
+            if let Ok(results) = oai::pmh::harvest(params).await {
                 for res in &results {
                     println!("{} {}", res.identifier(), res.datestamp());
                 }

@@ -1,7 +1,9 @@
 use reqwest;
 use serde::Deserialize;
 use quick_xml::de::from_str;
+use chrono::{DateTime, Utc};
 use url::Url;
+use std::time::SystemTime;
 
 #[derive(Debug, Deserialize)]
 struct ResponseError {
@@ -116,14 +118,43 @@ async fn download_url(
     }
 }
 
-pub async fn harvest(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
-    let mut url = Url::parse(base_url)?;
-    url.query_pairs_mut()
-        .append_pair("verb", "ListRecords")
-        .append_pair("metadataPrefix", "marc21");
-    println!("Url is {url}");
+pub struct HarvestParams {
+    pub base_url: String,
+    pub metadata_prefix: String,
+    pub set: Option<String>,
+    pub from: Option<SystemTime>,
+}
+
+impl HarvestParams {
+    pub fn harvest_url (&self, token: Option<&str>) -> Url {
+        let mut url = Url::parse(&self.base_url).expect("base_url needs to be valid");
+        url.query_pairs_mut().append_pair("verb", "ListRecords").append_pair("metadataPrefix", &self.metadata_prefix);
+        match token {
+            Some(token) => {
+                url.query_pairs_mut().append_pair("resumptionToken", token);
+            },
+            None => {
+                if let Some(oai_set) = &self.set {
+                    url.query_pairs_mut().append_pair("set", &oai_set);
+                }
+                if let Some(from_date) = self.from {
+                    let epoch = from_date.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                    let dt: DateTime<Utc> = DateTime::from_timestamp(epoch.as_secs() as i64,
+                                                                     epoch.subsec_nanos()).unwrap();
+                    let zulu = dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    println!("Zulu for url {} is {}", &self.base_url, &zulu);
+                    url.query_pairs_mut().append_pair("from", &zulu);
+                }
+            }
+        };
+        url
+    }
+}
+
+pub async fn harvest(params: HarvestParams) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
     let mut interaction = 1;
     let mut all_records: Vec<OaiPmhRecord> = Vec::new();
+    let mut url = params.harvest_url(None);
     loop {
         match download_url(url.clone()).await {
             Ok(res) => {
@@ -133,19 +164,17 @@ pub async fn harvest(base_url: &str) -> Result<Vec<OaiPmhRecord>, Box<dyn std::e
                     }
                     if let Some(token) = records.resumption_token {
                         interaction += 1;
-                        println!("{base_url} download n.{interaction}");
-                        url.query_pairs_mut()
-                            .clear()
-                            .append_pair("verb", "ListRecords")
-                            .append_pair("metadataPrefix", "marc21")
-                            .append_pair("resumptionToken", &token);
-                        continue
+                        println!("{url} download n.{interaction}");
+                        url = params.harvest_url(Some(&token));
+                        if interaction < 3 {
+                            continue
+                        }
                     } else {
-                        println!("{base_url} download completed");
+                        println!("{url} download completed");
                     }
                 }
             },
-            Err(e) => println!("Error {base_url}: {e}"),
+            Err(e) => println!("Error {url}: {e}"),
         };
         break
     };

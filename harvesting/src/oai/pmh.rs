@@ -18,6 +18,8 @@ struct ResponseError {
 pub struct OaiPmhRecordHeader {
     identifier: String,
     datestamp: String,
+    #[serde(rename = "@status")]
+    status: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,7 +52,7 @@ pub struct MarcSubField {
 pub struct MarcRecord {
     #[serde(rename = "@xmlns")]
     namespace: String,
-    leader: String,
+    leader: Option<String>,
     datafield: Vec<MarcDataField>,
 }
 
@@ -106,7 +108,7 @@ fn parse_response (xml: &str) -> OaiPmhResponse {
 async fn download_url(
     url: Url
 )-> Result<OaiPmhResponse, Box<dyn std::error::Error>> {
-    // println!("Downloading {url}");
+    println!("Downloading {url}");
     let res = reqwest::get(url).await?;
     let status = res.status().as_u16();
     let content = res.text().await?;
@@ -118,6 +120,7 @@ async fn download_url(
     }
 }
 
+#[derive(Debug)]
 pub struct HarvestParams {
     pub base_url: String,
     pub metadata_prefix: String,
@@ -158,19 +161,25 @@ pub async fn harvest(params: HarvestParams) -> Result<Vec<OaiPmhRecord>, Box<dyn
     loop {
         match download_url(url.clone()).await {
             Ok(res) => {
-                if let Some(records) = res.list_records {
-                    for rec in records.records {
-                        all_records.push(rec)
-                    }
-                    if let Some(token) = records.resumption_token {
-                        interaction += 1;
-                        println!("{url} download n.{interaction}");
-                        url = params.harvest_url(Some(&token));
-                        if interaction < 3 {
-                            continue
+                match res.list_records {
+                    Some(records) => {
+                        println!("{} {:?}", url, records);
+                        for rec in records.records {
+                            all_records.push(rec)
                         }
-                    } else {
-                        println!("{url} download completed");
+                        if let Some(token) = records.resumption_token {
+                            if token.len() > 1 {
+                                interaction += 1;
+                                println!("{url} download n.{interaction}");
+                                url = params.harvest_url(Some(&token));
+                                continue
+                            }
+                        } else {
+                            println!("{url} download completed");
+                        }
+                    },
+                    None => {
+                        println!("{url} {res:#?}returned no record");
                     }
                 }
             },

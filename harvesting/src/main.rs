@@ -9,18 +9,19 @@ use oai::pmh::HarvestParams;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pg_dsn = env::var("PG_DSN").expect("PG_DSN env variable should be set");
+    let pg_dsn = env::var("DATABASE_URL").expect("DATABASE_URL env variable should be set");
     let (client, connection) = tokio_postgres::connect(&pg_dsn, NoTls).await?;
     tokio::spawn(connection);
     let client = Arc::new(Mutex::new(client));
     let sql = r#"
-SELECT url, oai_metadata_format, oai_set, last_harvested, id, library_id
-FROM collector_site WHERE url <> ''
-     AND site_type IN ('amusewiki', 'generic', 'koha-marc21', 'koha-unimarc')
+SELECT url, oai_metadata_format, oai_set, last_harvested, site_id, library_id
+FROM site
+WHERE url <> ''
+      AND site_type IN ('amusewiki', 'generic', 'koha-marc21', 'koha-unimarc')
 ORDER BY url
 "#;
     let rows = client.lock().await.query(sql, &[]).await?;
-    let urls: Vec<(HarvestParams, i64, i64)> = rows.iter().map(|row|
+    let urls: Vec<(HarvestParams, i32, i32)> = rows.iter().map(|row|
                                                                (HarvestParams {
                                                                    base_url: row.get(0),
                                                                    metadata_prefix: row.get(1),
@@ -30,7 +31,7 @@ ORDER BY url
                                                                 row.get(4),
                                                                 row.get(5)
                                                                )).collect();
-    // dbg!("{:#?}", urls);
+    dbg!("{:#?}", &urls);
     let mut tasks = Vec::new();
     for todo in urls {
         let (params, site_id, library_id) = todo;

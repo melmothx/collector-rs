@@ -40,6 +40,7 @@ ORDER BY url
             if let Ok(results) = oai::pmh::harvest(params).await {
                 for res in &results {
                     println!("{} {} {} {}", res.identifier(), res.datestamp(), res.title(), res.subtitle());
+                    println!("{:?}, {:?}", res.authors(), res.languages());
                 }
             }
         });

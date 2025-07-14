@@ -64,15 +64,38 @@ pub struct OaiPmhRecord {
     metadata: OaiPmhRecordMetadata,
 }
 
-impl OaiPmhRecord {
+pub enum MetadataType {
+    Marc21,
+    UniMarc,
+}
+
+pub struct HarvestedRecord {
+    raw: OaiPmhRecord,
+    record_type: MetadataType,
+}
+
+impl HarvestedRecord {
+    fn new(record: OaiPmhRecord, record_type: &str) -> Self {
+        if (record_type == "unimarc") {
+            HarvestedRecord {
+                raw: record,
+                record_type: MetadataType::UniMarc,
+            }
+        } else {
+            HarvestedRecord {
+                raw: record,
+                record_type: MetadataType::Marc21,
+            }
+        }
+    }
     pub fn identifier(&self) -> &str {
-        self.header.identifier.as_str()
+        self.raw.header.identifier.as_str()
     }
     pub fn datestamp(&self) -> &str {
-        self.header.datestamp.as_str()
+        self.raw.header.datestamp.as_str()
     }
-    fn extract_fields(&self, field: &str, codes: Vec<&str>) -> String {
-        let rec = &self.metadata.record;
+    fn extract_fields(&self, field: &str, codes: Vec<&str>) -> Vec<&str> {
+        let rec = &self.raw.metadata.record;
         let mut out = Vec::new();
         for df in &rec.datafields {
             if df.tag == field {
@@ -85,18 +108,29 @@ impl OaiPmhRecord {
                 }
             }
         }
-        out.join(" ")
+        out
     }
-
     pub fn title(&self) -> String {
-        self.extract_fields("245", vec!("a", "b", "c"))
+        match &self.record_type {
+            MetadataType::Marc21 => self.extract_fields("245", vec!["a", "b", "c"]).join(" "),
+            MetadataType::UniMarc => self.extract_fields("200", vec!["a", "e"]).join(" "),
+        }
     }
     pub fn subtitle(&self) -> String {
-        self.extract_fields("246", vec!("a", "b"))
+        self.extract_fields("246", vec!["a", "b"]).join(" ")
     }
-
+    pub fn authors(&self) -> Vec<&str> {
+        self.extract_fields("100", vec!["a"])
+    }
+    pub fn languages(&self) -> Vec<&str> {
+        let mut langs = self.extract_fields("041", vec!["a"]);
+        langs.extend(self.extract_fields("546", vec!["a"]));
+        langs
+    }
+    pub fn description(&self) -> Vec<&str> {
+        Vec::new()
+    }
 }
-
 
 #[derive(Debug, Deserialize)]
 struct ListRecords {
@@ -180,18 +214,18 @@ impl HarvestParams {
     }
 }
 
-pub async fn harvest(params: HarvestParams) -> Result<Vec<OaiPmhRecord>, Box<dyn std::error::Error>> {
+pub async fn harvest(params: HarvestParams) -> Result<Vec<HarvestedRecord>, Box<dyn std::error::Error>> {
     let mut interaction = 1;
-    let mut all_records: Vec<OaiPmhRecord> = Vec::new();
+    let mut all_records: Vec<HarvestedRecord> = Vec::new();
     let mut url = params.harvest_url(None);
     loop {
         match download_url(url.clone()).await {
             Ok(res) => {
                 match res.list_records {
                     Some(records) => {
-                        println!("{} {:?}", url, records);
+                        // println!("{} {:?}", url, records);
                         for rec in records.records {
-                            all_records.push(rec)
+                            all_records.push(HarvestedRecord::new(rec, &params.metadata_prefix));
                         }
                         if let Some(token) = records.resumption_token {
                             if token.len() > 1 {

@@ -15,7 +15,7 @@ struct ResponseError {
 
 
 #[derive(Debug, Deserialize)]
-pub struct OaiPmhRecordHeader {
+struct OaiPmhRecordHeader {
     identifier: String,
     datestamp: String,
     #[serde(rename = "@status")]
@@ -23,13 +23,13 @@ pub struct OaiPmhRecordHeader {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct OaiPmhRecordMetadata {
+struct OaiPmhRecordMetadata {
     #[serde(rename = "record")]
     record: MarcRecord,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct MarcDataField {
+struct MarcDataField {
     #[serde(rename = "@tag")]
     tag: String,
     #[serde(rename = "@ind1")]
@@ -37,11 +37,11 @@ pub struct MarcDataField {
     #[serde(rename = "@ind2")]
     ind2: String,
     #[serde(rename = "subfield")]
-    subfield: Vec<MarcSubField>,
+    subfields: Vec<MarcSubField>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct MarcSubField {
+struct MarcSubField {
     #[serde(rename = "@code")]
     code: String,
     #[serde(rename = "$text")]
@@ -52,8 +52,10 @@ pub struct MarcSubField {
 pub struct MarcRecord {
     #[serde(rename = "@xmlns")]
     namespace: String,
-    leader: Option<String>,
-    datafield: Vec<MarcDataField>,
+    // ignore this
+    // leader: Option<String>,
+    #[serde(rename = "datafield")]
+    datafields: Vec<MarcDataField>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,6 +71,30 @@ impl OaiPmhRecord {
     pub fn datestamp(&self) -> &str {
         self.header.datestamp.as_str()
     }
+    fn extract_fields(&self, field: &str, codes: Vec<&str>) -> String {
+        let rec = &self.metadata.record;
+        let mut out = Vec::new();
+        for df in &rec.datafields {
+            if df.tag == field {
+                for sf in &df.subfields {
+                    for code in &codes {
+                        if &sf.code == code {
+                            out.push(sf.text.as_str());
+                        }
+                    }
+                }
+            }
+        }
+        out.join(" ")
+    }
+
+    pub fn title(&self) -> String {
+        self.extract_fields("245", vec!("a", "b", "c"))
+    }
+    pub fn subtitle(&self) -> String {
+        self.extract_fields("246", vec!("a", "b"))
+    }
+
 }
 
 

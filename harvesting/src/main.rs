@@ -39,7 +39,7 @@ ORDER BY url
         let task = tokio::spawn(async move {
             if let Ok(results) = oai::pmh::harvest(params).await {
                 for res in &results {
-                    println!("{} {}", res.identifier(), res.datestamp());
+                    println!("{} {} {} {}", res.identifier(), res.datestamp(), res.title(), res.subtitle());
                 }
             }
         });

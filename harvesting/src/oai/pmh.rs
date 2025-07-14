@@ -88,12 +88,6 @@ impl HarvestedRecord {
             }
         }
     }
-    pub fn identifier(&self) -> &str {
-        self.raw.header.identifier.as_str()
-    }
-    pub fn datestamp(&self) -> &str {
-        self.raw.header.datestamp.as_str()
-    }
     fn extract_fields(&self, field: &str, codes: Vec<&str>) -> Vec<&str> {
         let rec = &self.raw.metadata.record;
         let mut out = Vec::new();
@@ -110,6 +104,13 @@ impl HarvestedRecord {
         }
         out
     }
+    // we map these for the db
+    pub fn oai_pmh_identifier(&self) -> &str {
+        self.raw.header.identifier.as_str()
+    }
+    pub fn datestamp(&self) -> &str {
+        self.raw.header.datestamp.as_str()
+    }
     pub fn title(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => self.extract_fields("245", vec!["a", "b", "c"]).join(" "),
@@ -117,18 +118,160 @@ impl HarvestedRecord {
         }
     }
     pub fn subtitle(&self) -> String {
-        self.extract_fields("246", vec!["a", "b"]).join(" ")
+        match &self.record_type {
+            MetadataType::Marc21 => self.extract_fields("246", vec!["a", "b"]).join(" "),
+            MetadataType::UniMarc => String::from(""),
+        }
     }
+    // multiple
     pub fn authors(&self) -> Vec<&str> {
-        self.extract_fields("100", vec!["a"])
+        match &self.record_type {
+            MetadataType::Marc21 => self.extract_fields("100", vec!["a"]),
+            MetadataType::UniMarc => self.extract_fields("200", vec!["f"]),
+        }
     }
+    // multiple
     pub fn languages(&self) -> Vec<&str> {
-        let mut langs = self.extract_fields("041", vec!["a"]);
-        langs.extend(self.extract_fields("546", vec!["a"]));
-        langs
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                let mut langs = self.extract_fields("041", vec!["a"]);
+                langs.extend(self.extract_fields("546", vec!["a"]));
+                langs
+            },
+            MetadataType::UniMarc => {
+                self.extract_fields("101", vec!["a"])
+            },
+        }
     }
-    pub fn description(&self) -> Vec<&str> {
-        Vec::new()
+    pub fn description(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn year_edition(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn year_first_edition(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn publisher(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn isbn(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn uri(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn uri_label(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn content_type(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn material_description(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn shelf_location_code(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn edition_statement(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn place_date_of_publication_distribution(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                String::from("")
+            },
+            MetadataType::UniMarc => {
+                String::from("")
+            },
+        }
+    }
+    pub fn is_aggregation(&self) -> bool {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                false
+            },
+            MetadataType::UniMarc => {
+                false
+            },
+        }
     }
 }
 

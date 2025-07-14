@@ -1,5 +1,9 @@
-DROP TABLE IF EXISTS  site;
+DROP TABLE IF EXISTS datasource;
+DROP TABLE IF EXISTS entry;
+DROP TABLE IF EXISTS site;
 DROP TABLE IF EXISTS library;
+DROP TABLE IF EXISTS known_language;
+DROP TABLE IF EXISTS agent;
 
 CREATE TABLE library (
     library_id SERIAL NOT NULL PRIMARY KEY,
@@ -67,3 +71,58 @@ CALL insert_amw_site('Mycorrhiza', 'https://mycorrhiza.amusewiki.org/oai-pmh');
 CALL insert_amw_site('Amusewiki Staging', 'https://staging.amusewiki.org/oai-pmh');
 DROP PROCEDURE insert_amw_site;
 
+CREATE TABLE entry (
+    entry_id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    subtitle VARCHAR(255) NOT NULL DEFAULT '',
+    checksum VARCHAR(255) NOT NULL,
+    normalized_title VARCHAR(255) NOT NULL DEFAULT '',
+    original_entry_id INTEGER REFERENCES entry(entry_id),
+    canonical_entry_id INTEGER REFERENCES entry(entry_id),
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_indexed TIMESTAMP WITH TIME ZONE NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE agent (
+    agent_id SERIAL PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL,
+    normalized_full_name VARCHAR(255) NOT NULL DEFAULT '',
+    wikidata_id VARCHAR(255),
+    canonical_agent_id INTEGER REFERENCES agent(agent_id),
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(full_name)
+);
+
+CREATE TABLE datasource (
+    site_id INTEGER NOT NULL REFERENCES site(site_id),
+    oai_pmh_identifier VARCHAR(2048) NOT NULL,
+    datestamp TIMESTAMP WITH TIME ZONE,
+    entry_id INTEGER NOT NULL REFERENCES entry(entry_id),
+    description TEXT,
+    year_edition INTEGER,
+    year_first_edition INTEGER,
+    publisher TEXT,
+    isbn TEXT,
+    uri VARCHAR(2048),
+    uri_label VARCHAR(2048),
+    content_type VARCHAR(128),
+    material_description TEXT,
+    shelf_location_code VARCHAR(255),
+    edition_statement TEXT,
+    place_date_of_publication_distribution TEXT,
+    is_aggregation BOOL NOT NULL DEFAULT FALSE,
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(site_id, oai_pmh_identifier)
+);
+
+CREATE TABLE known_language (
+    language_code VARCHAR(3) NOT NULL PRIMARY KEY,
+    native_name VARCHAR(255),
+    english_name VARCHAR(255),
+    canonical_language_code VARCHAR(3) REFERENCES known_language(language_code),
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

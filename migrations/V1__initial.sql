@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS entry_author;
+DROP TABLE IF EXISTS entry_language;
 DROP TABLE IF EXISTS datasource;
 DROP TABLE IF EXISTS entry;
 DROP TABLE IF EXISTS site;
@@ -96,6 +98,7 @@ CREATE TABLE agent (
 );
 
 CREATE TABLE datasource (
+    datasource_id SERIAL PRIMARY KEY,
     site_id INTEGER NOT NULL REFERENCES site(site_id),
     oai_pmh_identifier VARCHAR(2048) NOT NULL,
     datestamp TIMESTAMP WITH TIME ZONE,
@@ -125,4 +128,18 @@ CREATE TABLE known_language (
     canonical_language_code VARCHAR(3) REFERENCES known_language(language_code),
     created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE entry_language (
+    entry_id INTEGER NOT NULL REFERENCES entry(entry_id),
+    language_code VARCHAR(3) NOT NULL REFERENCES known_language(language_code),
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(entry_id, language_code)
+);
+
+CREATE TABLE entry_author (
+    entry_id INTEGER NOT NULL REFERENCES entry(entry_id),
+    agent_id INTEGER NOT NULL REFERENCES agent(agent_id),
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(entry_id, agent_id)
 );

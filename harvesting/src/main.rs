@@ -39,8 +39,25 @@ ORDER BY url
         let task = tokio::spawn(async move {
             if let Ok(results) = oai::pmh::harvest(params).await {
                 for res in &results {
-                    println!("{} {} {} {}", res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
+                    println!("{} {} {} {} {}",
+                             res.identifier(),
+                             res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
                     println!("{:?}, {:?}", res.authors(), res.languages());
+                    println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {}",
+                             res.description(),
+                             res.year_edition(),
+                             res.year_first_edition(),
+                             res.publisher(),
+                             res.isbn(),
+                             res.uri(),
+                             res.uri_label(),
+                             res.content_type(),
+                             res.material_description(),
+                             res.shelf_location_code(),
+                             res.edition_statement(),
+                             res.place_date_of_publication_distribution(),
+                             res.is_aggregation(),
+                    );
                 }
             }
         });

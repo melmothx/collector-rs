@@ -4,6 +4,8 @@ use quick_xml::de::from_str;
 use chrono::{DateTime, Utc};
 use url::Url;
 use std::time::SystemTime;
+use regex::Regex;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 struct ResponseError {
@@ -76,7 +78,7 @@ pub struct HarvestedRecord {
 
 impl HarvestedRecord {
     fn new(record: OaiPmhRecord, record_type: &str) -> Self {
-        if (record_type == "unimarc") {
+        if record_type == "unimarc" {
             HarvestedRecord {
                 raw: record,
                 record_type: MetadataType::UniMarc,
@@ -110,6 +112,16 @@ impl HarvestedRecord {
     }
     pub fn datestamp(&self) -> &str {
         self.raw.header.datestamp.as_str()
+    }
+    pub fn identifier(&self) -> String {
+        match &self.record_type {
+            MetadataType::Marc21 => {
+                self.extract_fields("024", vec!["a"]).join(" ")
+            },
+            MetadataType::UniMarc => {
+                self.extract_fields("090", vec!["a"]).join(" ")
+            },
+        }
     }
     pub fn title(&self) -> String {
         match &self.record_type {
@@ -146,31 +158,53 @@ impl HarvestedRecord {
     pub fn description(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                self.extract_fields("520", vec!["a"]).join(" ")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                let mut descs = self.extract_fields("300", vec!["a"]);
+                descs.extend(self.extract_fields("330", vec!["a"]));
+                descs.join(" ")
             },
         }
     }
-    pub fn year_edition(&self) -> String {
+    fn dates(&self) -> Vec<&str> {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                let mut dates = self.extract_fields("264", vec!["c"]);
+                dates.extend(self.extract_fields("363", vec!["i"]));
+                dates.extend(self.extract_fields("362", vec!["a"]));
+                dates
             },
             MetadataType::UniMarc => {
-                String::from("")
+                self.extract_fields("210", vec!["d"])
             },
         }
     }
-    pub fn year_first_edition(&self) -> String {
-        match &self.record_type {
-            MetadataType::Marc21 => {
-                String::from("")
-            },
-            MetadataType::UniMarc => {
-                String::from("")
-            },
+    fn all_years(&self) -> Vec<i32> {
+        let re = Regex::new(r"\b\d{4}\b").unwrap();
+        let unique: HashSet<i32> = re.captures_iter(self.dates().join(" ").as_str())
+            .filter_map(|c| c.get(0).map(|year| year.as_str().parse::<i32>().ok()).flatten())
+            .collect();
+        let mut years: Vec<i32> = unique.into_iter().collect();
+        years.sort_unstable();
+        years
+    }
+    pub fn year_edition(&self) -> Option<i32> {
+        let years = self.all_years();
+        if years.is_empty() {
+            None
+        }
+        else {
+            Some(*years.last().unwrap())
+        }
+    }
+    pub fn year_first_edition(&self) -> Option<i32> {
+        let years = self.all_years();
+        if years.len() > 1 {
+            Some(*years.first().unwrap())
+        }
+        else {
+            None
         }
     }
     pub fn publisher(&self) -> String {
@@ -179,17 +213,17 @@ impl HarvestedRecord {
                 String::from("")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                self.extract_fields("210", vec!["c"]).join(" ")
             },
         }
     }
     pub fn isbn(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                self.extract_fields("020", vec!["a"]).join(" ")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                self.extract_fields("010", vec!["a"]).join(" ")
             },
         }
     }
@@ -229,7 +263,7 @@ impl HarvestedRecord {
                 String::from("")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                self.extract_fields("215", vec!["a", "c", "d", "e"]).join(" ")
             },
         }
     }
@@ -239,7 +273,9 @@ impl HarvestedRecord {
                 String::from("")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                let mut locs = self.extract_fields("950", vec!["a"]);
+                locs.extend(self.extract_fields("676", vec!["a"]));
+                locs.join(" ")
             },
         }
     }
@@ -249,7 +285,7 @@ impl HarvestedRecord {
                 String::from("")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                self.extract_fields("255", vec!["a", "v"]).join(" ")
             },
         }
     }
@@ -259,7 +295,7 @@ impl HarvestedRecord {
                 String::from("")
             },
             MetadataType::UniMarc => {
-                String::from("")
+                self.extract_fields("210", vec!["a", "d"]).join(" ")
             },
         }
     }

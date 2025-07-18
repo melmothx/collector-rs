@@ -115,7 +115,7 @@ CREATE TABLE datasource (
     shelf_location_code VARCHAR(255),
     edition_statement TEXT,
     place_date_of_publication_distribution TEXT,
-    is_aggregation BOOL NOT NULL DEFAULT FALSE,
+    is_aggregation BOOLEAN NOT NULL DEFAULT FALSE,
     created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(site_id, oai_pmh_identifier)

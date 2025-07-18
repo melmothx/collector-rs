@@ -66,11 +66,13 @@ pub struct OaiPmhRecord {
     metadata: OaiPmhRecordMetadata,
 }
 
+#[derive(Debug)]
 pub enum MetadataType {
     Marc21,
     UniMarc,
 }
 
+#[derive(Debug)]
 pub struct HarvestedRecord {
     raw: OaiPmhRecord,
     record_type: MetadataType,
@@ -180,7 +182,7 @@ impl HarvestedRecord {
             },
         }
     }
-    fn all_years(&self) -> Vec<i32> {
+    pub fn edition_years(&self) -> Vec<i32> {
         let re = Regex::new(r"\b\d{4}\b").unwrap();
         let unique: HashSet<i32> = re.captures_iter(self.dates().join(" ").as_str())
             .filter_map(|c| c.get(0).map(|year| year.as_str().parse::<i32>().ok()).flatten())
@@ -188,24 +190,6 @@ impl HarvestedRecord {
         let mut years: Vec<i32> = unique.into_iter().collect();
         years.sort_unstable();
         years
-    }
-    pub fn year_edition(&self) -> Option<i32> {
-        let years = self.all_years();
-        if years.is_empty() {
-            None
-        }
-        else {
-            Some(*years.last().unwrap())
-        }
-    }
-    pub fn year_first_edition(&self) -> Option<i32> {
-        let years = self.all_years();
-        if years.len() > 1 {
-            Some(*years.first().unwrap())
-        }
-        else {
-            None
-        }
     }
     pub fn publisher(&self) -> String {
         match &self.record_type {
@@ -365,6 +349,8 @@ pub struct HarvestParams {
     pub metadata_prefix: String,
     pub set: Option<String>,
     pub from: Option<SystemTime>,
+    pub library_id: i32,
+    pub site_id: i32,
 }
 
 impl HarvestParams {
@@ -393,7 +379,7 @@ impl HarvestParams {
     }
 }
 
-pub async fn harvest(params: HarvestParams) -> Result<Vec<HarvestedRecord>, Box<dyn std::error::Error>> {
+pub async fn harvest(params: &HarvestParams) -> Vec<HarvestedRecord> {
     let mut interaction = 1;
     let mut all_records: Vec<HarvestedRecord> = Vec::new();
     let mut url = params.harvest_url(None);
@@ -426,6 +412,6 @@ pub async fn harvest(params: HarvestParams) -> Result<Vec<HarvestedRecord>, Box<
         };
         break
     };
-    Ok(all_records)
+    all_records
 }
 

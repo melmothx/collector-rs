@@ -5,7 +5,7 @@ use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
 mod oai;
-use oai::pmh::HarvestParams;
+use oai::pmh::{HarvestParams,HarvestedRecord};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,43 +21,24 @@ WHERE url <> ''
 ORDER BY url
 "#;
     let rows = client.lock().await.query(sql, &[]).await?;
-    let urls: Vec<(HarvestParams, i32, i32)> = rows.iter().map(|row|
-                                                               (HarvestParams {
-                                                                   base_url: row.get(0),
-                                                                   metadata_prefix: row.get(1),
-                                                                   set: row.get(2),
-                                                                   from: row.get(3),
-                                                               },
-                                                                row.get(4),
-                                                                row.get(5)
-                                                               )).collect();
+    let urls: Vec<HarvestParams> = rows.iter().map(|row| HarvestParams {
+        base_url: row.get(0),
+        metadata_prefix: row.get(1),
+        set: row.get(2),
+        from: row.get(3),
+        site_id: row.get(4),
+        library_id: row.get(5),
+    }).collect();
     dbg!("{:#?}", &urls);
     let mut tasks = Vec::new();
     for todo in urls {
-        let (params, site_id, library_id) = todo;
         let client = Arc::clone(&client);
         let task = tokio::spawn(async move {
-            if let Ok(results) = oai::pmh::harvest(params).await {
-                for res in &results {
-                    println!("{} {} {} {} {}",
-                             res.identifier(),
-                             res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
-                    println!("{:?}, {:?}", res.authors(), res.languages());
-                    println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {}",
-                             res.description(),
-                             res.year_edition(),
-                             res.year_first_edition(),
-                             res.publisher(),
-                             res.isbn(),
-                             res.uri(),
-                             res.uri_label(),
-                             res.content_type(),
-                             res.material_description(),
-                             res.shelf_location_code(),
-                             res.edition_statement(),
-                             res.place_date_of_publication_distribution(),
-                             res.is_aggregation(),
-                    );
+            let results = oai::pmh::harvest(&todo).await;
+            for res in results {
+                match insert_harvested_record(&client, &todo, &res).await {
+                    Ok(return_id) => println!("Inserted/Updated row with URL ID: {}", return_id),
+                    Err(e) => eprintln!("Error inserting status code for {:?}: {:?}", res, e),
                 }
             }
         });
@@ -67,15 +48,36 @@ ORDER BY url
     Ok(())
 }
 
-async fn insert_dl_result(client: &Arc<Mutex<Client>>, status: u16, site_id: i64, library_id: i64, content: &str)
-                          -> Result<i32, Box<dyn std::error::Error>> {
+async fn insert_harvested_record(client: &Arc<Mutex<Client>>,
+                                 params: &HarvestParams,
+                                 res: &HarvestedRecord)
+                                 -> Result<i32, Box<dyn std::error::Error>> {
+    println!("{:?} {} {} {} {} {}",
+             params,
+             res.identifier(),
+             res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
+    println!("{:?}, {:?}", res.authors(), res.languages());
+    println!("{} | {:?} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {}",
+             res.description(),
+             res.edition_years(),
+             res.publisher(),
+             res.isbn(),
+             res.uri(),
+             res.uri_label(),
+             res.content_type(),
+             res.material_description(),
+             res.shelf_location_code(),
+             res.edition_statement(),
+             res.place_date_of_publication_distribution(),
+             res.is_aggregation(),
+    );
     let client = client.lock().await;
     let sql = r#"
-INSERT INTO requests (status, site_id, library_id, content)
-VALUES ($1, $2, $3, $4)
-RETURNING id
+INSERT INTO entry (title, checksum)
+VALUES ($1, $2)
+RETURNING entry_id
 "#;
-    let rows = client.query(sql, &[&(status as i32), &site_id, &library_id, &content]).await?;
+    let rows = client.query(sql, &[&res.title(), &"test"]).await?;
     match rows.first().map(|row| row.get(0)) {
         Some(id) => Ok(id),
         None => Err(String::from("No id created").into()),

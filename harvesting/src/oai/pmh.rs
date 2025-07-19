@@ -334,16 +334,60 @@ impl HarvestedRecord {
             },
         }
     }
-    pub fn is_aggregation(&self) -> bool {
+    pub fn aggregations(&self) -> Vec<RecordAggregation> {
         match &self.record_type {
             MetadataType::Marc21 => {
-                false
+                let mut out = Vec::<RecordAggregation>::new();
+                for aggregation_field in self.get_fields("773") {
+                    let mut agg = RecordAggregation {
+                        name: None,
+                        issue: None,
+                        isbn: None,
+                        order: None,
+                        place_date_publisher: None,
+                        item_identifier: None,
+                        linkage: None,
+                    };
+                    for sf in &aggregation_field.subfields {
+                        let text = String::from(&sf.text);
+                        match sf.code.as_str() {
+                            "t" => { agg.name = Some(text) }
+                            "g" => { agg.issue = Some(text) },
+                            "z" => { agg.isbn = Some(text) },
+                            "q" => {
+                                match text.parse::<i32>() {
+                                    Ok(i) => { agg.order = Some(i) },
+                                    Err(_) => {},
+                                }
+                            },
+                            "d" => { agg.place_date_publisher = Some(text) },
+                            "o" => { agg.item_identifier = Some(text) },
+                            "6" => { agg.linkage = Some(text) },
+                            _ => {},
+                        };
+                    }
+                    if let Some(_) = agg.name {
+                        out.push(agg);
+                    }
+                }
+                out
             },
             MetadataType::UniMarc => {
-                false
+                Vec::<RecordAggregation>::new()
             },
         }
     }
+}
+
+#[derive(Debug)]
+pub struct RecordAggregation {
+    name: Option<String>,
+    issue: Option<String>,
+    isbn: Option<String>,
+    order: Option<i32>,
+    place_date_publisher: Option<String>,
+    item_identifier: Option<String>,
+    linkage: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

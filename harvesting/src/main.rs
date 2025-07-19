@@ -58,7 +58,7 @@ async fn insert_harvested_record(client: &Arc<Mutex<Client>>,
              res.identifier(),
              res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
     println!("{:?}, {:?}", res.authors(), res.languages());
-    println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {}",
+    println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {:?}",
              res.description(),
              res.edition_years(),
              res.uri(),
@@ -68,7 +68,7 @@ async fn insert_harvested_record(client: &Arc<Mutex<Client>>,
              res.shelf_location_code(),
              res.edition_statement(),
              res.place_date_of_publication_distribution(),
-             res.is_aggregation(),
+             res.aggregations(),
     );
     let client = client.lock().await;
     let sql = r#"

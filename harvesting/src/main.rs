@@ -52,19 +52,18 @@ async fn insert_harvested_record(client: &Arc<Mutex<Client>>,
                                  params: &HarvestParams,
                                  res: &HarvestedRecord)
                                  -> Result<i32, Box<dyn std::error::Error>> {
+    // println!("{:?}", res.uri());
     println!("{:?} {} {} {} {} {}",
              params,
              res.identifier(),
              res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
     println!("{:?}, {:?}", res.authors(), res.languages());
-    println!("{} | {:?} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {}",
+    println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {}",
              res.description(),
              res.edition_years(),
+             res.uri(),
              res.publisher(),
              res.isbn(),
-             res.uri(),
-             res.uri_label(),
-             res.content_type(),
              res.material_description(),
              res.shelf_location_code(),
              res.edition_statement(),

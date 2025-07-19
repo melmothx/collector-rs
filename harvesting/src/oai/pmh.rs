@@ -73,35 +73,57 @@ pub enum MetadataType {
 }
 
 #[derive(Debug)]
+pub struct RecordUri {
+    uri: String,
+    content_type: String,
+    uri_label: String,
+}
+
+#[derive(Debug)]
 pub struct HarvestedRecord {
     raw: OaiPmhRecord,
     record_type: MetadataType,
+    host: String,
 }
 
 impl HarvestedRecord {
-    fn new(record: OaiPmhRecord, record_type: &str) -> Self {
-        if record_type == "unimarc" {
+    fn new(record: OaiPmhRecord, params: &HarvestParams) -> Self {
+        let base_uri = Url::parse(&params.base_url).expect("url must be valid at this point");
+        let host = match base_uri.host_str() {
+            Some(h) => String::from(h),
+            None => String::from(""),
+        };
+        if params.metadata_prefix == "unimarc" {
             HarvestedRecord {
                 raw: record,
                 record_type: MetadataType::UniMarc,
+                host,
             }
         } else {
             HarvestedRecord {
                 raw: record,
                 record_type: MetadataType::Marc21,
+                host,
             }
         }
     }
-    fn extract_fields(&self, field: &str, codes: Vec<&str>) -> Vec<&str> {
+    fn get_fields(&self, field: &str) -> Vec<&MarcDataField> {
         let rec = &self.raw.metadata.record;
         let mut out = Vec::new();
         for df in &rec.datafields {
             if df.tag == field {
-                for sf in &df.subfields {
-                    for code in &codes {
-                        if &sf.code == code {
-                            out.push(sf.text.as_str());
-                        }
+                out.push(df)
+            }
+        }
+        out
+    }
+    fn extract_fields(&self, field: &str, codes: Vec<&str>) -> Vec<&str> {
+        let mut out = Vec::new();
+        for df in self.get_fields(field) {
+            for sf in &df.subfields {
+                for code in &codes {
+                    if &sf.code == code {
+                        out.push(sf.text.as_str());
                     }
                 }
             }
@@ -211,34 +233,57 @@ impl HarvestedRecord {
             },
         }
     }
-    pub fn uri(&self) -> String {
+    pub fn uri(&self) -> Option<RecordUri> {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                let re = Regex::new(r"https?://").unwrap();
+                let mut found_uri = None;
+                for uri in self.get_fields("856") {
+                    let mut same_host = false;
+                    let mut found = false;
+                    let mut uri_str = "";
+                    let mut content_type = "";
+                    let mut label = "";
+                    for sf in &uri.subfields {
+                        if &sf.code == "u" {
+                            if re.is_match(&sf.text) {
+                                // println!("{} found!", sf.text);
+                                same_host = sf.text.contains(&self.host);
+                                uri_str = &sf.text;
+                                found = true;
+                            }
+                        } else if &sf.code == "q" {
+                            content_type = &sf.text;
+                        } else if &sf.code == "y" {
+                            label = &sf.text;
+                        }
+                    }
+                    if found {
+                        let uri_struct = RecordUri {
+                            uri: String::from(uri_str),
+                            content_type: String::from(content_type),
+                            uri_label: String::from(label),
+                        };
+                        found_uri = Some(uri_struct);
+                        // if we have an uri matching the origin, stop here
+                        if same_host {
+                            break
+                        }
+                    }
+                }
+                // try the koha uri if nothing was found
+                if let None = found_uri {
+                    if let Some(koha_uri) = self.extract_fields("952", vec!["u"]).first() {
+                        found_uri = Some(RecordUri {
+                            uri: koha_uri.to_string(),
+                            content_type: String::from(""),
+                            uri_label: String::from(""),
+                        });
+                    }
+                }
+                found_uri
             },
-            MetadataType::UniMarc => {
-                String::from("")
-            },
-        }
-    }
-    pub fn uri_label(&self) -> String {
-        match &self.record_type {
-            MetadataType::Marc21 => {
-                String::from("")
-            },
-            MetadataType::UniMarc => {
-                String::from("")
-            },
-        }
-    }
-    pub fn content_type(&self) -> String {
-        match &self.record_type {
-            MetadataType::Marc21 => {
-                String::from("")
-            },
-            MetadataType::UniMarc => {
-                String::from("")
-            },
+            MetadataType::UniMarc => None
         }
     }
     pub fn material_description(&self) -> String {
@@ -390,7 +435,7 @@ pub async fn harvest(params: &HarvestParams) -> Vec<HarvestedRecord> {
                     Some(records) => {
                         // println!("{} {:?}", url, records);
                         for rec in records.records {
-                            all_records.push(HarvestedRecord::new(rec, &params.metadata_prefix));
+                            all_records.push(HarvestedRecord::new(rec, &params));
                         }
                         if let Some(token) = records.resumption_token {
                             if token.len() > 1 {

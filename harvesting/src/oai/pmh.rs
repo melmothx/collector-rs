@@ -216,7 +216,9 @@ impl HarvestedRecord {
     pub fn publisher(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                let mut publishers = self.extract_fields("260",  vec!["b"]);
+                publishers.extend(self.extract_fields("264",  vec!["b"]));
+                publishers.join(" ")
             },
             MetadataType::UniMarc => {
                 self.extract_fields("210", vec!["c"]).join(" ")
@@ -289,7 +291,7 @@ impl HarvestedRecord {
     pub fn material_description(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                self.extract_fields("300", vec!["a", "b", "c", "e"]).join(" ")
             },
             MetadataType::UniMarc => {
                 self.extract_fields("215", vec!["a", "c", "d", "e"]).join(" ")
@@ -299,7 +301,9 @@ impl HarvestedRecord {
     pub fn shelf_location_code(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                let mut locs = self.extract_fields("952", vec!["o"]);
+                locs.extend(self.extract_fields("852", vec!["c"]));
+                locs.join(" ")
             },
             MetadataType::UniMarc => {
                 let mut locs = self.extract_fields("950", vec!["a"]);
@@ -311,7 +315,7 @@ impl HarvestedRecord {
     pub fn edition_statement(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                self.extract_fields("250", vec!["a"]).join(" ")
             },
             MetadataType::UniMarc => {
                 self.extract_fields("255", vec!["a", "v"]).join(" ")
@@ -321,7 +325,9 @@ impl HarvestedRecord {
     pub fn place_date_of_publication_distribution(&self) -> String {
         match &self.record_type {
             MetadataType::Marc21 => {
-                String::from("")
+                let mut places = self.extract_fields("260", vec!["a", "c"]);
+                places.extend(self.extract_fields("264", vec!["a", "c"]));
+                places.join(" ")
             },
             MetadataType::UniMarc => {
                 self.extract_fields("210", vec!["a", "d"]).join(" ")

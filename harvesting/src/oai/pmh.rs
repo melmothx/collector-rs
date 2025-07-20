@@ -335,9 +335,9 @@ impl HarvestedRecord {
         }
     }
     pub fn aggregations(&self) -> Vec<RecordAggregation> {
+        let mut out = Vec::<RecordAggregation>::new();
         match &self.record_type {
             MetadataType::Marc21 => {
-                let mut out = Vec::<RecordAggregation>::new();
                 for aggregation_field in self.get_fields("773") {
                     let mut agg = RecordAggregation {
                         name: None,
@@ -347,6 +347,7 @@ impl HarvestedRecord {
                         place_date_publisher: None,
                         item_identifier: None,
                         linkage: None,
+                        host: self.host.clone(),
                     };
                     for sf in &aggregation_field.subfields {
                         let text = String::from(&sf.text);
@@ -367,15 +368,15 @@ impl HarvestedRecord {
                         };
                     }
                     if let Some(_) = agg.name {
+                        // println!("Aggregation: {}", agg.identifier());
                         out.push(agg);
                     }
                 }
-                out
             },
             MetadataType::UniMarc => {
-                Vec::<RecordAggregation>::new()
             },
-        }
+        };
+        out
     }
 }
 
@@ -388,6 +389,42 @@ pub struct RecordAggregation {
     place_date_publisher: Option<String>,
     item_identifier: Option<String>,
     linkage: Option<String>,
+    host: String,
+}
+
+impl RecordAggregation {
+    pub fn name(&self) -> &str {
+        match &self.name {
+            Some(aggregation_name) => &aggregation_name,
+            None => panic!("The name method cannot be called without the name set")
+        }
+    }
+    pub fn identifier(&self) -> String {
+        let mut identifier = vec!["aggregation", &self.host];
+        match &self.item_identifier {
+            Some(item_identifier) => {
+                identifier.push(&item_identifier)
+            },
+            None => {
+                identifier.push(self.name());
+                if let Some(issue_number) = &self.issue {
+                    identifier.push(&issue_number)
+                }
+            }
+        }
+        identifier.join(":")
+    }
+    pub fn full_aggregation_name(&self) -> String {
+        let mut full_name = Vec::new();
+        full_name.push(self.name());
+        if let Some(issue_number) = &self.issue {
+            full_name.push(&issue_number)
+        }
+        if let Some(place_date_publisher) = &self.place_date_publisher {
+            full_name.push(&place_date_publisher)
+        }
+        full_name.join(" ")
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -510,3 +547,72 @@ pub async fn harvest(params: &HarvestParams) -> Vec<HarvestedRecord> {
     all_records
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn id1_ok() {
+        let rec =  RecordAggregation {
+            name: Some(String::from("test")),
+            issue: Some(String::from("n.1")),
+            isbn: None,
+            order: None,
+            place_date_publisher: None,
+            item_identifier: None,
+            linkage: None,
+            host: String::from("test-host"),
+        };
+        assert_eq!(rec.identifier(), "aggregation:test-host:test:n.1");
+        assert_eq!(rec.full_aggregation_name(), "test n.1");
+    }
+
+    #[test]
+    fn id2_ok() {
+        let rec =  RecordAggregation {
+            name: Some(String::from("test")),
+            issue: Some(String::from("n.1")),
+            isbn: None,
+            order: None,
+            place_date_publisher: (Some(String::from("Some place"))),
+            item_identifier: Some(String::from("xxx")),
+            linkage: None,
+            host: String::from("test-host"),
+        };
+        assert_eq!(rec.identifier(), "aggregation:test-host:xxx");
+        assert_eq!(rec.full_aggregation_name(), "test n.1 Some place");
+    }
+
+    #[test]
+    fn id3_ok() {
+        let rec =  RecordAggregation {
+            name: Some(String::from("test")),
+            issue: None,
+            isbn: None,
+            order: None,
+            place_date_publisher: None,
+            item_identifier: None,
+            linkage: None,
+            host: String::from("test-host"),
+        };
+        for _ in [1, 2] {
+            assert_eq!(rec.identifier(), "aggregation:test-host:test");
+            assert_eq!(rec.full_aggregation_name(), "test");
+        }
+    }
+    #[test]
+    #[should_panic]
+    fn bad_id_ok() {
+        let rec =  RecordAggregation {
+            name: None,
+            issue: None,
+            isbn: None,
+            order: None,
+            place_date_publisher: None,
+            item_identifier: None,
+            linkage: None,
+            host: String::from("test-host"),
+        };
+        rec.name();
+    }
+
+}

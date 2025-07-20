@@ -13,3 +13,4 @@ quick-xml = { version = "0.38.0", features = [ "serialize" ] }
 url = "2.2"
 chrono = "0.4.41"
 regex = "1.11.1"
+sha2 = "0.10.9"

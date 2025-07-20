@@ -6,6 +6,7 @@ use url::Url;
 use std::time::SystemTime;
 use regex::Regex;
 use std::collections::HashSet;
+use sha2::{Sha256, Digest};
 
 #[derive(Debug, Deserialize)]
 struct ResponseError {
@@ -424,6 +425,9 @@ impl RecordAggregation {
             full_name.push(&place_date_publisher)
         }
         full_name.join(" ")
+    }
+    pub fn checksum(&self) -> String {
+        format!("{:x}", Sha256::digest(self.full_aggregation_name()))
     }
 }
 

@@ -604,8 +604,7 @@ impl HarvestedRecord {
                     }
                 }
             },
-            MetadataType::UniMarc => {
-            },
+            MetadataType::UniMarc => (),
         };
         out
     }
@@ -624,6 +623,26 @@ impl HarvestedRecord {
         hasher.update(self.subtitle());
         hasher.update(self.title());
         format!("{:x}", hasher.finalize())
+    }
+    pub async fn full_text(&self) -> Result<String, Box<dyn std::error::Error>> {
+        match self.site_type {
+            SiteType::Amusewiki => {
+                match self.uri() {
+                    Some(uri) => {
+                        let bare_html = format!("{}.bare.html", uri.uri);
+                        let body = reqwest::get(&bare_html).await?.text().await?;
+                        // println!("Downloaded {bare_html}");
+                        Ok(body)
+                    }
+                    None => {
+                        Err(format!("No uri found").into())
+                    }
+                }
+            }
+            _ => {
+                Err(format!("Not a site type with full text").into())
+            },
+        }
     }
 }
 

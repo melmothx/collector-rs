@@ -57,7 +57,7 @@ async fn insert_harvested_record(client: &Arc<Mutex<Client>>,
              params,
              res.identifier(),
              res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
-    println!("{:?}, {:?}", res.authors(), res.languages());
+    println!("{:?}, {:?}, {}", res.authors(), res.languages(), res.checksum());
     println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {:?}",
              res.description(),
              res.edition_years(),

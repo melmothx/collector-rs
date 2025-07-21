@@ -73,6 +73,14 @@ pub enum MetadataType {
     UniMarc,
 }
 
+#[derive(Clone, Debug)]
+pub enum SiteType {
+    Amusewiki,
+    KohaMarc21,
+    KohaUnimarc,
+}
+
+
 #[derive(Debug)]
 pub struct RecordUri {
     uri: String,
@@ -85,6 +93,7 @@ pub struct HarvestedRecord {
     raw: OaiPmhRecord,
     record_type: MetadataType,
     host: String,
+    site_type: SiteType,
 }
 
 pub fn language_iso_code(lang: &str) -> String {
@@ -314,22 +323,18 @@ pub fn language_iso_code(lang: &str) -> String {
 impl HarvestedRecord {
     fn new(record: OaiPmhRecord, params: &HarvestParams) -> Self {
         let base_uri = Url::parse(&params.base_url).expect("url must be valid at this point");
-        let host = match base_uri.host_str() {
-            Some(h) => String::from(h),
-            None => String::from(""),
-        };
-        if params.metadata_prefix == "unimarc" {
-            HarvestedRecord {
-                raw: record,
-                record_type: MetadataType::UniMarc,
-                host,
-            }
-        } else {
-            HarvestedRecord {
-                raw: record,
-                record_type: MetadataType::Marc21,
-                host,
-            }
+        HarvestedRecord {
+            raw: record,
+            record_type: match params.site_type {
+                SiteType::KohaUnimarc => MetadataType::UniMarc,
+                SiteType::KohaMarc21 => MetadataType::Marc21,
+                SiteType::Amusewiki => MetadataType::Marc21,
+            },
+            host: match base_uri.host_str() {
+                Some(h) => String::from(h),
+                None => String::from(""),
+            },
+            site_type: params.site_type.clone(),
         }
     }
     fn get_fields(&self, field: &str) -> Vec<&MarcDataField> {
@@ -584,13 +589,13 @@ impl HarvestedRecord {
                             "q" => {
                                 match text.parse::<i32>() {
                                     Ok(i) => { agg.order = Some(i) },
-                                    Err(_) => {},
+                                    Err(_) => (),
                                 }
                             },
                             "d" => { agg.place_date_publisher = Some(text) },
                             "o" => { agg.item_identifier = Some(text) },
                             "6" => { agg.linkage = Some(text) },
-                            _ => {},
+                            _ => (),
                         };
                     }
                     if let Some(_) = agg.name {
@@ -723,24 +728,30 @@ async fn download_url(
 #[derive(Debug)]
 pub struct HarvestParams {
     pub base_url: String,
-    pub metadata_prefix: String,
-    pub set: Option<String>,
     pub from: Option<SystemTime>,
     pub library_id: i32,
     pub site_id: i32,
+    pub site_type: SiteType,
 }
 
 impl HarvestParams {
     pub fn harvest_url (&self, token: Option<&str>) -> Url {
         let mut url = Url::parse(&self.base_url).expect("base_url needs to be valid");
-        url.query_pairs_mut().append_pair("verb", "ListRecords").append_pair("metadataPrefix", &self.metadata_prefix);
+        let metadata_prefix = match self.site_type {
+            // I think this is just a misconfiguration, but that's what we get in our cases
+            SiteType::KohaUnimarc => "marc21",
+            SiteType::KohaMarc21 => "marc21",
+            SiteType::Amusewiki => "marc21",
+        };
+        url.query_pairs_mut().append_pair("verb", "ListRecords")
+            .append_pair("metadataPrefix", metadata_prefix);
         match token {
             Some(token) => {
                 url.query_pairs_mut().append_pair("resumptionToken", token);
             },
             None => {
-                if let Some(oai_set) = &self.set {
-                    url.query_pairs_mut().append_pair("set", &oai_set);
+                if let SiteType::Amusewiki = self.site_type {
+                    url.query_pairs_mut().append_pair("set", "web");
                 }
                 if let Some(from_date) = self.from {
                     let epoch = from_date.duration_since(SystemTime::UNIX_EPOCH).unwrap();

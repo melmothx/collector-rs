@@ -5,7 +5,7 @@ use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
 mod oai;
-use oai::pmh::{HarvestParams,HarvestedRecord};
+use oai::pmh::{HarvestParams,HarvestedRecord,SiteType};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,20 +14,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(connection);
     let client = Arc::new(Mutex::new(client));
     let sql = r#"
-SELECT url, oai_metadata_format, oai_set, last_harvested, site_id, library_id
+SELECT url, site_type, last_harvested, site_id, library_id
 FROM site
-WHERE url <> ''
-      AND site_type IN ('amusewiki', 'generic', 'koha-marc21', 'koha-unimarc')
+WHERE url <> '' AND site_type IN ('amusewiki', 'koha-marc21', 'koha-unimarc')
 ORDER BY url
 "#;
     let rows = client.lock().await.query(sql, &[]).await?;
     let urls: Vec<HarvestParams> = rows.iter().map(|row| HarvestParams {
         base_url: row.get(0),
-        metadata_prefix: row.get(1),
-        set: row.get(2),
-        from: row.get(3),
-        site_id: row.get(4),
-        library_id: row.get(5),
+        site_type: match row.get(1) {
+            "amusewiki" => SiteType::Amusewiki,
+            "koha-marc21" => SiteType::KohaMarc21,
+            "koha-unimarc" => SiteType::KohaUnimarc,
+            _ => panic!("Invalid site_type"),
+        },
+        from: row.get(2),
+        site_id: row.get(3),
+        library_id: row.get(4),
     }).collect();
     dbg!("{:#?}", &urls);
     let mut tasks = Vec::new();

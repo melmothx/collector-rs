@@ -46,7 +46,7 @@ LIMIT 10;
                         title: row.get(1),
                         rank: row.get(2),
                     }).collect();
-    dbg!("{:?}", &out);
+    tracing::debug!("{:?}", &out);
     (StatusCode::OK, Json(out))
 }
 

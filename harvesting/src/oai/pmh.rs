@@ -83,9 +83,9 @@ pub enum SiteType {
 
 #[derive(Debug)]
 pub struct RecordUri {
-    uri: String,
-    content_type: String,
-    uri_label: String,
+    pub uri: String,
+    pub content_type: String,
+    pub uri_label: String,
 }
 
 #[derive(Debug)]
@@ -629,9 +629,8 @@ impl HarvestedRecord {
             SiteType::Amusewiki => {
                 match self.uri() {
                     Some(uri) => {
-                        let bare_html = format!("{}.bare.html", uri.uri);
-                        let body = reqwest::get(&bare_html).await?.text().await?;
-                        // println!("Downloaded {bare_html}");
+                        let muse = format!("{}.muse", uri.uri);
+                        let body = reqwest::get(&muse).await?.text().await?;
                         Ok(body)
                     },
                     None => {

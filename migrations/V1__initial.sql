@@ -153,27 +153,34 @@ CREATE TABLE entry_language (
 );
 
 CREATE OR REPLACE FUNCTION update_search_vector() RETURNS TRIGGER AS $$
-DECLARE body_text TEXT;
+DECLARE title_text TEXT;
 DECLARE agent_names TEXT;
+DECLARE full_text TEXT;
 BEGIN
-    SELECT string_agg(ds.search_text, ' ') INTO body_text
-    FROM datasource ds WHERE ds.entry_id = NEW.entry_id;
+    SELECT string_agg(e.search_text, ' ') INTO title_text
+    FROM entry e WHERE e.entry_id = NEW.entry_id;
 
     SELECT string_agg(a.search_text, ' ') INTO agent_names
     FROM agent a
     INNER JOIN entry_agent ea ON a.agent_id = ea.agent_id
     WHERE ea.entry_id = NEW.entry_id;
 
-    NEW.search_vector :=
-      setweight(to_tsvector(COALESCE(NEW.search_text, '')), 'A') ||
-      setweight(to_tsvector(COALESCE(agent_names, '')), 'B') ||
-      setweight(to_tsvector(COALESCE(body_text, '')), 'C');
+    SELECT string_agg(ds.search_text, ' ') INTO full_text
+    FROM datasource ds
+    WHERE ds.entry_id = NEW.entry_id;
+
+    UPDATE entry SET search_vector =
+          setweight(to_tsvector(COALESCE(title_text, '')), 'A') ||
+          setweight(to_tsvector(COALESCE(agent_names, '')), 'B') ||
+          setweight(to_tsvector(COALESCE(full_text, '')), 'C')
+    WHERE entry_id = NEW.entry_id;
     RETURN NEW;
 END
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_entry_search_vector
-BEFORE INSERT OR UPDATE ON entry
+AFTER INSERT OR UPDATE ON datasource
 FOR EACH ROW EXECUTE FUNCTION update_search_vector();
 
 CREATE INDEX idx_search_vector ON entry USING GIN(search_vector);
+-- SELECT title FROM entry WHERE search_vector @@ websearch_to_tsquery('-test and doc');

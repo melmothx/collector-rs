@@ -183,4 +183,9 @@ AFTER INSERT OR UPDATE ON datasource
 FOR EACH ROW EXECUTE FUNCTION update_search_vector();
 
 CREATE INDEX idx_search_vector ON entry USING GIN(search_vector);
--- SELECT title FROM entry WHERE search_vector @@ websearch_to_tsquery('-test and doc');
+
+SELECT title, ts_rank_cd(search_vector, query) AS rank
+FROM entry, websearch_to_tsquery('-test and doc') query
+WHERE search_vector @@ query
+ORDER BY rank DESC
+LIMIT 10;

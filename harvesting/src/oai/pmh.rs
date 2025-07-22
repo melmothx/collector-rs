@@ -633,10 +633,10 @@ impl HarvestedRecord {
                         let body = reqwest::get(&bare_html).await?.text().await?;
                         // println!("Downloaded {bare_html}");
                         Ok(body)
-                    }
+                    },
                     None => {
                         Err(format!("No uri found").into())
-                    }
+                    },
                 }
             }
             _ => {

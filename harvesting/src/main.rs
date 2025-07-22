@@ -5,6 +5,7 @@ use tokio_postgres::{NoTls, Client};
 use tokio;
 use std::env;
 mod oai;
+mod mycorrhiza;
 use oai::pmh::{HarvestParams,HarvestedRecord,SiteType};
 
 #[tokio::main]
@@ -39,9 +40,9 @@ ORDER BY url
         let task = tokio::spawn(async move {
             let results = oai::pmh::harvest(&todo).await;
             for res in results {
-                match insert_harvested_record(&client, &todo, &res).await {
-                    Ok(return_id) => println!("Inserted/Updated row with URL ID: {}", return_id),
-                    Err(e) => eprintln!("Error inserting status code for {:?}: {:?}", res, e),
+                match mycorrhiza::insert_harvested_record(&client, &todo, &res).await {
+                    Ok(return_id) => (),
+                    Err(e) => eprintln!("Error inserting record for {:?}: {:?}", res, e),
                 }
             }
         });
@@ -51,37 +52,3 @@ ORDER BY url
     Ok(())
 }
 
-async fn insert_harvested_record(client: &Arc<Mutex<Client>>,
-                                 params: &HarvestParams,
-                                 res: &HarvestedRecord)
-                                 -> Result<i32, Box<dyn std::error::Error>> {
-    // println!("{:?}", res.uri());
-    println!("{:?} {} {} {} {} {}",
-             params,
-             res.identifier(),
-             res.oai_pmh_identifier(), res.datestamp(), res.title(), res.subtitle());
-    println!("{:?}, {:?}, {}", res.authors(), res.languages(), res.checksum());
-    println!("{} | {:?} | {:?} | {} | {} | {} | {} | {} | {} | {:?}",
-             res.description(),
-             res.edition_years(),
-             res.uri(),
-             res.publisher(),
-             res.isbn(),
-             res.material_description(),
-             res.shelf_location_code(),
-             res.edition_statement(),
-             res.place_date_of_publication_distribution(),
-             res.aggregations(),
-    );
-    let client = client.lock().await;
-    let sql = r#"
-INSERT INTO entry (title, checksum)
-VALUES ($1, $2)
-RETURNING entry_id
-"#;
-    let rows = client.query(sql, &[&res.title(), &"test"]).await?;
-    match rows.first().map(|row| row.get(0)) {
-        Some(id) => Ok(id),
-        None => Err(String::from("No id created").into()),
-    }
-}

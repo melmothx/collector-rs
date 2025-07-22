@@ -88,6 +88,7 @@ CREATE TABLE entry (
     created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_indexed TIMESTAMP WITH TIME ZONE NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+    search_vector TSVECTOR,
     UNIQUE(checksum)
 );
 
@@ -150,3 +151,29 @@ CREATE TABLE entry_language (
     last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY(entry_id, language_code)
 );
+
+CREATE OR REPLACE FUNCTION update_search_vector() RETURNS TRIGGER AS $$
+DECLARE body_text TEXT;
+DECLARE agent_names TEXT;
+BEGIN
+    SELECT string_agg(ds.search_text, ' ') INTO body_text
+    FROM datasource ds WHERE ds.entry_id = NEW.entry_id;
+
+    SELECT string_agg(a.search_text, ' ') INTO agent_names
+    FROM agent a
+    INNER JOIN entry_agent ea ON a.agent_id = ea.agent_id
+    WHERE ea.entry_id = NEW.entry_id;
+
+    NEW.search_vector :=
+      setweight(to_tsvector(COALESCE(NEW.search_text, '')), 'A') ||
+      setweight(to_tsvector(COALESCE(agent_names, '')), 'B') ||
+      setweight(to_tsvector(COALESCE(body_text, '')), 'C');
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_entry_search_vector
+BEFORE INSERT OR UPDATE ON entry
+FOR EACH ROW EXECUTE FUNCTION update_search_vector();
+
+CREATE INDEX idx_search_vector ON entry USING GIN(search_vector);

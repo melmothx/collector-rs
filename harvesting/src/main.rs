@@ -33,7 +33,6 @@ ORDER BY url
         site_id: row.get(3),
         library_id: row.get(4),
     }).collect();
-    dbg!("{:#?}", &urls);
     let mut tasks = Vec::new();
     for todo in urls {
         let client = Arc::clone(&client);

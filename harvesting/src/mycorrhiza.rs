@@ -198,10 +198,7 @@ RETURNING datasource_id
     }
     let datestamp_string = res.datestamp();
     let datestamp = match datestamp_string.parse::<DateTime<Utc>>() {
-        Ok(t) => {
-            println!("{datestamp_string} => {t}");
-            t
-        }
+        Ok(t) => t,
         Err(e) => {
             eprintln!("Error parsing timestamp: {e}");
             Utc::now()
